@@ -1,0 +1,43 @@
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.pytest-tmp/
+.mypy_cache/
+.ruff_cache/
+
+# Sandbox pip temp (safe to delete manually)
+.pip-tmp/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Agent runtime output
+.memory/
+.transcripts/
+.task_outputs/
+.runtime/
+
+# Editors and OS files
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+#task
+.tasks/
+
+schema.sql
+.scheduled_tasks.json
+
+# Reference repo download artifacts (local working material, not part of the course)
+.ref-repo/
+.ref-repo.zip
+_dl_ref.py
