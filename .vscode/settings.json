@@ -1,0 +1,11 @@
+{
+  "python.defaultInterpreterPath": "${workspaceFolder}\\.venv\\Scripts\\python.exe",
+  "python.terminal.activateEnvironment": true,
+  "python.testing.pytestEnabled": true,
+  "python.testing.cwd": "${workspaceFolder}/learn_claude_code_langchain",
+  "python.testing.pytestArgs": ["tests"],
+  "files.encoding": "utf8",
+  "terminal.integrated.env.windows": {
+    "PYTHONUTF8": "1"
+  }
+}

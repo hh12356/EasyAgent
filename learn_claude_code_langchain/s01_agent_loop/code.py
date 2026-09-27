@@ -29,6 +29,7 @@ from langchain.messages import AIMessageChunk
 from langchain.tools import tool
 from langchain_openai import ChatOpenAI
 
+#加载.env，用.env 里的值强制覆盖已经存在的os.environ环境变量。
 load_dotenv(override=True)
 
 MODEL = os.environ["MODEL_ID"]
@@ -55,6 +56,7 @@ def bash(command: str) -> str:
                 timeout=120,
             )
             output = (result.stdout + result.stderr).strip()
+            #截断
             output = output[:50000] if output else "(no output)"
         except subprocess.TimeoutExpired:
             output = "Error: Timeout (120s)"
@@ -78,6 +80,7 @@ def get_agent():
             api_key=os.getenv("OPENAI_API_KEY"),
             base_url=os.getenv("BASE_URL") or None,
             max_completion_tokens=8000,
+            #控制模型随机性，0即确定性最高
             temperature=0,
         )
         # create_agent 在 LangGraph 上生成“模型 -> 工具 -> 模型”的执行图。
@@ -96,14 +99,17 @@ def agent_loop(messages: list) -> None:
         if chunk["type"] == "messages":
             token, metadata = chunk["data"]
             if (
+                #判断对象类型
                 isinstance(token, AIMessageChunk)
-                and metadata.get("langgraph_node") == "model"
+                and metadata.get("langgraph_node") == "model"#还有tool类型
                 and token.text
             ):
+                #end=''取消末尾换行,flush=True标准输出默认行缓冲
                 print(token.text, end="", flush=True)
         elif chunk["type"] == "values":
             final_messages = chunk["data"]["messages"]
 
+    #切片赋值：外部history同步更新
     messages[:] = final_messages
     print()
 
