@@ -40,7 +40,9 @@ SYSTEM = f"You are a coding agent at {WORKDIR}. Use the available tools to solve
 
 def safe_path(path: str) -> Path:
     """把用户提供的路径解析到工作区内，越界时拒绝。"""
+    #.resolve()解析为绝对路径
     resolved = (WORKDIR / path).resolve()
+    #判断是否在WORKDIR目录下
     if not resolved.is_relative_to(WORKDIR):
         raise ValueError(f"Path escapes workspace: {path}")
     return resolved
