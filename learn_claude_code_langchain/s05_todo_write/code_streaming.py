@@ -164,8 +164,8 @@ register_hook('Stop', on_stop)
 def run_bash(command: str) -> str:
     """Execute a shell command in the current workspace."""
     try:
-        r = subprocess.run(command, shell=True, cwd=WORKDIR, capture_output=True, text=True, timeout=120)
-        out = (r.stdout + r.stderr).strip()
+        r = subprocess.run(command, shell=True, cwd=WORKDIR, capture_output=True, text=True, errors="replace", timeout=120)
+        out = ((r.stdout or '') + (r.stderr or '')).strip()
         return out[:50000] if out else '(no output)'
     except subprocess.TimeoutExpired:
         return 'Error: Timeout(120s)'
