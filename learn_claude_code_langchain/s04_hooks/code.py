@@ -159,7 +159,7 @@ def glob(pattern: str) -> str:
 TOOLS = [bash, read_file, write_file, edit_file, glob]
 
 
-# -- New in s04: hook registry and lifecycle callbacks --
+# -- New in s04: hook registry and lifecycle callbacks  钩子注册表与生命周期回调 --
 
 
 HOOKS = {"UserPromptSubmit": [], "PreToolUse": [], "PostToolUse": [], "Stop": []}
