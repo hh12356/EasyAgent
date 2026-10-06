@@ -77,8 +77,10 @@ TOOL_RESULTS_DIR = (
 )
 KEEP_RECENT_TOOL_RESULTS = 3
 TOOL_RESULT_BUDGET_BYTES =200_000
+#工具结果大小超过该阈值（字节），就持久化写入磁盘；小于阈值则保存在内存，不落地
 PERSIST_THRESHOLD_BYTES = 30_000
 
+#上下文窗口最大 token 数
 CONTEXT_WINDOW_TOKENS = int(
     os.getenv("CONTEXT_WINDOW_TOKENS", "128000")
 )
@@ -92,6 +94,7 @@ AUTO_COMPACT_TOKENS = (
     - AUTOCOMPACT_BUFFER_TOKENS
 )
 
+#Agent 上下文压缩熔断参数
 MAX_COMPACT_FAILURES = 3
 
 SKILL_DIR = WORKDIR/"skills"
@@ -131,7 +134,8 @@ def _safe_tail_start(
     if isinstance(messages[start], AIMessage):
         if messages[start].tool_calls:
             return start
-        
+
+    #放弃按原计划截断
     return original
 
 # ------------------------------------------------------------------
