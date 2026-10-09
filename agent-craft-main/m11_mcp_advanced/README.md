@@ -1,0 +1,261 @@
+# 🧩 模块说明：MCP 高级篇 - 多模态协作协议客户端实现
+
+> 📌 核心知识点：MCP协议高级应用｜传输层封装｜LangChain集成｜流式输出｜多服务管理
+
+---
+
+### 1. `s01_agent_stream.py` （通用流式输出组件）
+
+实现通用的LangGraph事件流监听和可视化输出功能，提供友好的用户交互体验。
+
+- ✅ 掌握点：
+  - LangGraph v2事件流的监听与处理
+  - LLM流式吐字的实时渲染
+  - 工具调用过程的可视化展示
+  - 异步事件处理的最佳实践
+
+- 功能：
+  - 监听LLM的流式输出并实时打印
+  - 显示工具调用的开始和结束状态
+  - 过滤内部包装工具，只显示自定义工具
+  - 优化控制台输出格式，提升用户体验
+
+> 💡 这是一个独立的工具组件，可以与任何LangGraph应用集成，用于增强用户交互体验。
+
+---
+
+### 2. `s02_final_mcp_main.py` （官方库实现示例）
+
+使用官方`langchain_mcp_adapters`库实现的完整MCP应用示例，展示了如何快速集成MCP服务。
+
+- ✅ 掌握点：
+  - 官方MultiServerMCPClient的使用方法
+  - MCP服务的配置与初始化
+  - LangGraph工作流的构建
+  - 官方库与自定义组件的结合使用
+
+- 功能演示：
+  - 初始化多服务器MCP客户端
+  - 加载高德地图MCP服务
+  - 构建基于LangGraph的地理位置助手
+  - 使用自定义流式输出组件展示结果
+
+> 💡 这是一个独立的示例应用，展示了如何使用官方库快速实现MCP功能，适合作为实际项目的参考。
+
+#### 可选：连接需要 Bearer 鉴权的远端 MCP
+
+`s02_final_mcp_main.py` 的 `MCP_SERVERS` 还提供了注释状态的「远端 Bearer MCP」配置。若服务使用 Streamable HTTP 和 `Authorization: Bearer`，在根目录的 `.env` 中设置自己的 `MCP_HTTP_URL` 与 `MCP_BEARER_TOKEN`，再取消注释该配置。若只测试远端服务，也要注释默认启用的高德 stdio 配置。`required_env()` 会拒绝缺失或空白的值，`required_mcp_url()` 仅允许 HTTPS 远端和本机回环 HTTP 测试地址；密钥只放在 Header 中，不拼接到 URL。请只连接可信任的服务。本仓新增的 `.gitignore` 忽略 `.env` 和本地变体，请勿把真实密钥写入源码、Issue 或 PR。
+
+例如，[百智云 Agent Toolkit 的公开接入说明](https://github.com/chaitin/baizhi-agent-toolkit#连接信息)给出的 `MCP_HTTP_URL` 为 `https://agent-toolkit.app.baizhi.cloud/mcp`，鉴权方式为 `Bearer <API Key>`。这是一个**可选的第三方托管服务例子**：公开仓库仅含集成配置、文档和测试，不包含托管后端源码；需用户自备 Key，部分工具调用可能消耗额度。工具参数会发往所配置的服务。示例只说明如何填写客户端配置，不能据此认为已经完成线上连接或工具调用验收。
+
+这里使用仓库锁定的 `langchain_mcp_adapters==0.2.1`：官方 `MultiServerMCPClient` 会把 `headers` 交给 Streamable HTTP 会话，现有示例随后通过 `get_tools()` 把工具交给 LangGraph。下方教学用的**自写 HTTP 传输**目前不接收自定义鉴权 Header，不能直接套用这段配置。当前 `config.py` 在导入时会校验 `OPENAI_API_KEY`、`LANGCHAIN_API_KEY`、`AMAP_MAPS_API_KEY`、`CHATGPT_API_KEY` 四项，即使注释高德配置也仍如此；运行完整的 `s02_final_mcp_main.py` 还会调用模型。原示例的系统提示和固定查询面向地图，改用其他 MCP 时要一起改为适合其工具的任务。请先用获准的服务与测试凭据验证连接和费用边界。
+
+---
+
+### 独立练习：`s03_parallel_search.py`（免费网页搜索与抓取）
+
+通过与上方官方库示例相同的 `MultiServerMCPClient`，连接 [Parallel Search MCP](https://docs.parallel.ai/integrations/mcp/search-mcp) 的 Streamable HTTP 端点 `https://search.parallel.ai/mcp`。用 `get_tools()` 发现工具后，通过 LangChain 工具的 `ainvoke()` 调用 `web_search` 或 `web_fetch`，打印包含来源的内容块。
+
+在仓库根目录安装此练习的依赖并运行（Python 3.10+）：
+
+```bash
+python -m venv .venv-parallel
+source .venv-parallel/bin/activate
+# Windows PowerShell: .venv-parallel\Scripts\Activate.ps1
+python -m pip install -r m11_mcp_advanced/requirements-parallel.txt
+python -m m11_mcp_advanced.s03_parallel_search search "查找 Python asyncio 官方教程" --query "Python asyncio official tutorial"
+python -m m11_mcp_advanced.s03_parallel_search fetch https://docs.python.org/3/library/asyncio.html
+```
+
+`--query` 可重复传入以提供多个关键词查询；`fetch` 可传入多个 URL（服务每次最多接受 20 个），默认返回内容摘要。该练习直接调用工具，不运行 LLM 或 Agent 循环，也不导入 `config.py`、读取 `.env` 或需要高德/模型/Parallel API Key。现有地图示例的配置不变。无需 Node.js 或本地 MCP 服务器。
+
+匿名端点免费，适合探索和轻量使用，但有速率限制，并非无限调用；单次工具调用的摘要总量约限制为 25,000 字符。查询和 URL 会发送给 Parallel，请避免提交敏感信息。网络、服务限流或工具错误会作为异常显示；需要网络连接。
+
+---
+
+### 组件系统：自定义MCP客户端实现
+
+以下文件共同构成一个完整的自定义MCP客户端组件系统，实现了从传输层到应用层的完整封装。
+
+---
+
+### 3. `transports/base.py` （传输层协议接口）
+
+定义MCP传输层的抽象协议接口，为所有传输实现提供统一的规范。
+
+- ✅ 掌握点：
+  - Python Protocol的使用方法
+  - 抽象接口的设计原则
+  - MCP协议的核心方法定义
+
+- 功能：
+  - 定义MCP传输层必须实现的四个核心方法：connect、list_tools、call_tool、cleanup
+  - 提供类型注解，确保接口一致性
+  - 为不同传输实现提供统一的调用方式
+
+> 💡 这是整个组件系统的基础，定义了传输层的契约，使得上层代码可以与具体传输实现解耦。
+
+---
+
+### 4. `transports/http.py` （HTTP传输实现）
+
+实现基于HTTP协议的MCP传输层，支持与远程MCP服务器通信。
+
+- ✅ 掌握点：
+  - HTTP JSON-RPC请求的实现
+  - 异步HTTP客户端的使用
+  - 会话管理与超时处理
+  - 流式响应的处理
+
+- 功能：
+  - 建立与远程MCP服务器的HTTP连接
+  - 发送initialize请求并管理会话
+  - 查询工具列表和调用工具
+  - 处理普通JSON响应和SSE流式响应
+
+> 💡 此实现支持远程MCP服务调用，适合构建分布式系统中的MCP客户端。
+
+---
+
+### 5. `transports/stdio.py` （标准输入输出传输实现）
+
+实现基于标准输入输出的MCP传输层，支持与本地MCP服务通信。
+
+- ✅ 掌握点：
+  - AsyncExitStack资源管理
+  - 子进程通信的实现
+  - MCP协议的低级实现
+  - 异步上下文管理器的应用
+
+- 功能：
+  - 启动本地MCP服务进程
+  - 建立标准输入输出管道通信
+  - 管理MCP会话生命周期
+  - 自动清理资源
+
+> 💡 此实现支持本地MCP服务调用，适合开发和调试阶段使用。
+
+---
+
+### 6. `mcp_client.py` （客户端主类）
+
+实现MCP客户端的主类，封装传输层实现，提供统一的客户端接口。
+
+- ✅ 掌握点：
+  - 工厂模式的应用
+  - 依赖注入的实现
+  - 客户端接口的设计
+  - 错误处理的最佳实践
+
+- 功能：
+  - 支持stdio和http两种传输方式
+  - 封装连接、工具列表查询、工具调用和资源清理
+  - 提供统一的客户端接口，隐藏传输层细节
+  - 实现防御性编程，增强代码健壮性
+
+> 💡 这是客户端组件的核心，为上层应用提供简洁易用的接口，同时屏蔽了底层传输的复杂性。
+
+---
+
+### 7. `mcp_bridge.py` （LangChain桥接器）
+
+实现MCP工具到LangChain工具的自动转换，使MCP服务能够无缝集成到LangChain生态中。
+
+- ✅ 掌握点：
+  - JSON Schema到Pydantic模型的动态转换
+  - LangChain工具的创建与配置
+  - 批量工具加载的实现
+  - 异步上下文管理器的应用
+
+- 功能：
+  - 将MCP工具转换为LangChain可用的工具
+  - 动态生成Pydantic参数模型
+  - 支持批量加载多个MCP服务的工具
+  - 管理MCP客户端的生命周期
+
+> 💡 这是MCP与LangChain集成的关键组件，实现了两种生态系统之间的无缝对接。
+
+---
+
+### 8. `mcp_main.py` （完整应用示例）
+
+使用自定义MCP客户端组件实现的完整应用示例，展示了整个组件系统的协作使用。
+
+- ✅ 掌握点：
+  - 组件系统的整体架构
+  - 多MCP服务的配置与管理
+  - LangGraph工作流的构建
+  - 资源的统一管理
+
+- 功能演示：
+  - 配置多个MCP服务（云端和本地）
+  - 批量加载MCP工具
+  - 构建基于LangGraph的智能体
+  - 使用流式输出展示结果
+
+> 💡 这是整个组件系统的完整演示，展示了如何使用自定义实现构建功能完整的MCP应用。
+
+---
+
+### 组件系统架构图
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                     应用层                              │
+│  ┌───────────────┐  ┌────────────────────────────────┐  │
+│  │  mcp_main.py  │  │ final_mcp_main.py (官方库)     │  │
+│  └───────────────┘  └────────────────────────────────┘  │
+│              │                     │                    │
+└──────────────┼─────────────────────┼────────────────────┘
+               │                     │
+┌──────────────┼─────────────────────┼────────────────────┐
+│                     集成层                              │
+│  ┌───────────────┐                ┌─────────────────┐  │
+│  │  mcp_bridge.py│                │ agent_stream.py │  │
+│  └───────────────┘                └─────────────────┘  │
+│              │                                          │
+└──────────────┼──────────────────────────────────────────┘
+               │
+┌──────────────┼──────────────────────────────────────────┐
+│                     客户端层                            │
+│  ┌───────────────┐                                      │
+│  │  mcp_client.py│                                      │
+│  └───────────────┘                                      │
+│              │                                          │
+└──────────────┼──────────────────────────────────────────┘
+               │
+┌──────────────┼──────────────────────────────────────────┐
+│                     传输层                              │
+│  ┌───────────────┐  ┌───────────────┐  ┌─────────────┐  │
+│  │ transports/   │  │ transports/   │  │ transports/ │  │
+│  │   base.py     │  │   http.py     │  │   stdio.py  │  │
+│  └───────────────┘  └───────────────┘  └─────────────┘  │
+└─────────────────────────────────────────────────────────┘
+```
+
+---
+
+### 🔔 全局注意事项
+
+- **学习路径建议**：
+  1. 先学习独立组件：`s01_agent_stream.py` → `s02_final_mcp_main.py`
+  2. 再学习组件系统：`transports/base.py` → `transports/http.py` → `transports/stdio.py` → `mcp_client.py` → `mcp_bridge.py` → `mcp_main.py`
+
+- **环境准备**：
+  - 地图与 Agent 示例依赖根目录 `.env` 中的 API 密钥配置；`s03_parallel_search.py` 独立练习不需要密钥
+  - 高德 stdio MCP 服务需要 Node.js 环境，确保已安装并配置正确路径
+  - 运行前请确保已安装必要依赖：`pip install -r requirements.txt`
+  - 高德地图MCP服务需要 `AMAP_MAPS_API_KEY` 环境变量配置
+
+- **运行说明**：
+  - 在仓库根目录运行官方库示例：`python -m m11_mcp_advanced.s02_final_mcp_main`
+  - 在仓库根目录运行组件系统示例：`python -m m11_mcp_advanced.mcp_main`
+  - 本地MCP服务需要先启动：`python -m m10_mcp_basics.s02_streamable_http_server`
+
+---
+
+### 💡 **扩展建议**
+- 扩展MCP客户端，支持更多高级特性（如超时控制、重试机制等）
+- 实现自定义的MCP服务，与客户端组件配合使用
+- 探索将MCP客户端与其他AI框架集成
+- 优化流式输出组件，支持更多展示效果
