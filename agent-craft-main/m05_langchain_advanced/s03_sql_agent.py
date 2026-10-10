@@ -14,9 +14,12 @@ llm = ChatOpenAI(
 
 # 创建一个临时的数据库--用于演示
 db_file = "test_sql.db"
+#每次启动都删除重置
 if os.path.exists(db_file):
     os.remove(db_file)
+#连接数据库，没有即新建(肯定是新建)
 conn = sqlite3.connect(db_file)
+#切换到游标，可以执行SQL操作
 cursor = conn.cursor()
 cursor.execute("CREATE TABLE users (id INT,name TEXT,age INT);")
 cursor.execute("INSERT INTO users (id,name,age) VALUES (1,'Alice',30);")

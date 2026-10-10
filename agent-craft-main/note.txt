@@ -2,7 +2,11 @@ prompt的关键概念 Cot（Chain-of-thought）：让模型思考步骤，提高
 (1)Zero-shot CoT:不用给例子，只加一句提示：Let's think step by step.（一步步思考）
 (2)Few-shot CoT:在 prompt 里放几个「问题 + 分步推理 + 答案」的样例，模型模仿样例格式做推理
 
+langchain基础
+
 ReAct 是一种 大模型 Agent 智能体范式
 核心就是 Thought → Action → Observation 循环
 
 langchain帮我们干完了造轮子的活，并统一接口，提高代码的复用性...
+
+当用@tool封装某个函数作为工具时，必须要用"""xx"""来为其添加描述信息，否则报错

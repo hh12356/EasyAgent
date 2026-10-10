@@ -34,6 +34,7 @@ def get_user_name(user):
 
 tools = [get_weather,get_user_name]
 
+#第一个tools是告诉llm可以使用哪些tools，第二个是执行
 # 创建Agent(大脑)
 agent = create_tool_calling_agent(llm=llm,prompt=prompt,tools=tools)
 # 创建AgentExecutor(执行器)--负责运行ReAct循环
