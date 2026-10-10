@@ -1,5 +1,5 @@
-from embeddings import get_embeddings
 from config import OPENAI_API_KEY
+from embeddings import get_embeddings
 import os
 from langchain_community.document_loaders import TextLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
@@ -83,11 +83,12 @@ def format_docs(docs):
 
 # 5. 组装 RAG 链条(LCEL)
 rag_chain = (
+    #RunnablePassthrough()：并行运行两个分支，保留原始输入，让它不被RAG检索链“吃掉”
     {"context":retrieve | format_docs,"question":RunnablePassthrough()}
     | prompt
     | llm
     | StrOutputParser()
-)
+)# |两边都是Runnable对象
 
 # --- 运行 RAG 链 ---
 

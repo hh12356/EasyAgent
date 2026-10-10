@@ -38,21 +38,23 @@ with open('knowledge_base.txt','w',encoding='utf8') as f:
     f.write(knowledge_base_content)
 
 # 1.加载
-# TextLoader 读取.txt文件，并将其转换为Document对象
+# TextLoader 创建一个文本加载器对象，load()真正读取并保存为Document对象
 loader = TextLoader('knowledge_base.txt',encoding='utf8')
 docs = loader.load()
 print(f'{docs}已加载完成!')
 
 # 2.分割
+#按照分隔符优先级切分
 text_splitter = RecursiveCharacterTextSplitter(
     # 本节重点
     chunk_size=250, # 设定的chunk块大小(字符数),
     chunk_overlap=40 # 设定的重叠大小(字符数)
 ) # 创建分割器的配置模板
-splits = text_splitter.split_documents(docs) # 实际执行切割
+splits = text_splitter.split_documents(docs) # 实际执行切割 splits:list[Document]
 
 print(f'分块结果:{len(splits)}')
 
+#enumerate() 是 Python 内置函数：同时拿到 索引 + 元素
 for i,doc in enumerate(splits):
     print(f'片段{i+1}(长度:{len(doc.page_content)})')
     print(doc.page_content)
