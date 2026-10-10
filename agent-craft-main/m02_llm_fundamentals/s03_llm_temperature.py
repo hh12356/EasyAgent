@@ -4,6 +4,7 @@ from openai import OpenAI
 client = OpenAI(api_key=OPENAI_API_KEY, base_url="https://api.deepseek.com")
 msg = [{"role": "user", "content": "请用一句话生动形象地描述量子力学的奇妙之处。"}]
 
+#一般temperature区间：0.0~2.0
 response_low_temperature = client.chat.completions.create(
     model="deepseek-chat",
     messages=[
