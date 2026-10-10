@@ -2,3 +2,10 @@
 .env.*
 !.env.example
 .venv-parallel/
+
+# 向量索引：跑一遍脚本就能重新生成，不入库
+**/faiss_index/
+**/chroma_db*/
+
+# 本地下载的 embedding 模型（184M/个）：公网可重新下载，不入库
+**/models/
