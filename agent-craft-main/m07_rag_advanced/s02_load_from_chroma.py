@@ -1,8 +1,8 @@
+from config import OPENAI_API_KEY
 from langchain_chroma import Chroma
 from langchain_core.output_parsers import StrOutputParser
 from langchain_openai import ChatOpenAI
 from embeddings import get_embeddings
-from config import OPENAI_API_KEY
 import os
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import RunnablePassthrough
