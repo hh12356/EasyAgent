@@ -77,7 +77,7 @@ workflow.add_edge("tools","agent")
 
 
 # 编译时启用记忆
-app = workflow.compile(checkpointer=MemorySaver())
+app = workflow.compile(checkpointer=MemorySaver()) #?
 
 
 
