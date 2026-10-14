@@ -30,6 +30,7 @@ class StdioMCPTransport:
             return # 已连接无需重复
         # 进入transport（读/写管道）
         transport = await self.exit_stack.enter_async_context(
+            #stdio 传输方式的 MCP 客户端
             stdio_client(self.params)
         )
         # 创建JSON-RPC对话

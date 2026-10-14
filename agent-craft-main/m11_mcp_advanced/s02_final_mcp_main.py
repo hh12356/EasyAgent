@@ -105,7 +105,7 @@ def build_graph(available_tools):
                 # 将list/dict转为JSON字符串
                 formatted_messages.append(
                     ToolMessage(
-                        content=json.dumps(msg.content,ensure_ascii=False),
+                        content=json.dumps(msg.content,ensure_ascii=False), # ensure_ascii=False 不转义
                         tool_call_id=msg.tool_call_id
                     )
                 )

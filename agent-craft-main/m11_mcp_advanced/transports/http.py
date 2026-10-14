@@ -33,11 +33,6 @@ class HttpMCPTransport:
             "clientInfo":{"name":"mcp-client","version":"1.0"}
         })
 
-        # 保存session ID
-        if response and "result" in response:
-            # Session ID在响应头内
-            pass # 已在_http_request中处理
-
 
     async def list_tools(self):
         """查询工具列表，为LLM建立上下文用"""

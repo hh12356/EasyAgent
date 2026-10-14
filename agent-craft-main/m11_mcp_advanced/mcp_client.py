@@ -14,6 +14,7 @@ class MCPClient:
 
     def __init__(
             self,
+            # Literal:限定变量 / 函数参数只能取你指定的几个字面常量
             transport:Literal["stdio","http"]="stdio",
             command:str=None,
             args:list[str]=None,

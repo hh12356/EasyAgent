@@ -1,3 +1,4 @@
+from config import OPENAI_API_KEY,AMAP_MAPS_API_KEY
 import os
 import sys
 from contextlib import AsyncExitStack
@@ -8,7 +9,6 @@ from langchain_core.messages import SystemMessage
 from langgraph.graph import StateGraph,MessagesState,START,END
 from langgraph.prebuilt import ToolNode
 
-from config import OPENAI_API_KEY,AMAP_MAPS_API_KEY
 from m11_mcp_advanced.s01_agent_stream import run_agent_with_streaming
 from m11_mcp_advanced.mcp_bridge import LangChainMCPAdapter
 
@@ -20,13 +20,13 @@ env_vars["AMAP_MAPS_API_KEY"] = AMAP_MAPS_API_KEY
 
 MCP_SERVER_CONFIGS = [
     # 方式1.1: 云端代理 —— stdio模式
-    {
-        "name":"高德地图", # 打印使用了什么MCP，可移除
-        "transport":"stdio", # 指定传输模式
-        "command":"npx",
-        "args":["-y", "@amap/amap-maps-mcp-server"],
-        "env":env_vars
-    }
+    # {
+    #     "name":"高德地图", # 打印使用了什么MCP，可移除
+    #     "transport":"stdio", # 指定传输模式
+    #     "command":"npx",
+    #     "args":["-y", "@amap/amap-maps-mcp-server"],
+    #     "env":env_vars
+    # }
 
     # 方式1.2: 云端MCP服务 —— Streamable HTTP模式
     # {
@@ -45,11 +45,11 @@ MCP_SERVER_CONFIGS = [
     # }
 
     # 方式2.2:本地MCP服务 —— Streamable HTTP 模式
-    # {
-    #     "name":"本地天气",
-    #     "transport":"http",
-    #     "url": "http://127.0.0.1:8001/mcp"
-    # }
+    {
+        "name":"本地天气",
+        "transport":"http",
+        "url": "http://127.0.0.1:8001/mcp"
+    }
     # {...}  之后MCP工具可随需求扩展增加
 ]
 
