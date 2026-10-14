@@ -92,6 +92,7 @@ def triage_instructions(context_variables):
 # 退票专员
 refund_agent = Agent(
     name="RefundAgent",
+    #系统提示词
     instructions=refund_instructions(context_variables),
     tools=[execute_refund],
     model=model

@@ -1,7 +1,6 @@
 import sys
 import os
 import asyncio
-import nest_asyncio
 import uuid
 from agents import Runner, set_tracing_disabled, SQLiteSession
 from openai.types.responses import ResponseTextDeltaEvent
@@ -13,7 +12,6 @@ import streamlit as st
 from m12_agents_sdk_swarm.s01_tools import context_variables
 from m12_agents_sdk_swarm.s02_agent import triage_agent, amap_server
 
-nest_asyncio.apply()
 set_tracing_disabled(True)
 
 # 生成/获取动态 Session ID
@@ -21,15 +19,11 @@ if "session_id" not in st.session_state:
 	st.session_state.session_id = f"session_{uuid.uuid4().hex[:8]}"
 
 
-async def init_mcp():
-	try:
-		await amap_server[0].connect()
-		return "✅ 高德地图（按需连接）"
-	except Exception as e:
-		return f"⚠️ MCP 连接失败"
-
-
-mcp_status = asyncio.run(init_mcp())
+# MCP 连接状态：不能在模块层用 asyncio.run() 连接 —— 那会新建一个事件循环、
+# 连完立刻关闭，而 MCP 的 anyio 流绑定在连接时的那个循环上，跨循环使用会 ClosedResourceError。
+# 改为在 process_stream 内（与 Agent 同一个循环）按需连接后写入这里。
+if "mcp_status" not in st.session_state:
+	st.session_state.mcp_status = "⏳ 高德地图：首次提问时连接"
 
 st.set_page_config(page_title="智能客服驾驶舱", layout="wide")
 st.title("✈️ 智能航空客服 Multi-Agent 系统")
@@ -80,7 +74,7 @@ with st.sidebar:
 	st.json(context_variables)
 
 	st.subheader("🔌 MCP 状态")
-	st.caption(mcp_status)
+	st.caption(st.session_state.mcp_status)
 
 	st.subheader("📊 会话统计")
 	st.metric("消息数", len(st.session_state.display_messages))
@@ -117,6 +111,21 @@ if prompt:
 
 	with st.status("Agent 正在思考...", expanded=True) as status:
 		async def process_stream():
+			# MCP 会话绑定在「连接时」的那个事件循环上，而 Streamlit 每次交互都会重跑脚本、
+			# 由 asyncio.run() 新建一个循环，旧的循环连同会话一起失效（ClosedResourceError）。
+			# 所以每轮都先关掉上一轮的连接，再在当前循环里重建。
+			# cleanup() 对已失效的循环是安全的：它内部吞异常/锁绑定错误，只把 session 置空。
+			try:
+				await amap_server[0].cleanup()
+			except Exception:
+				pass
+			try:
+				await amap_server[0].connect()
+				st.session_state.mcp_status = "✅ 高德地图（已连接）"
+			except Exception as e:
+				# 不要吞掉异常信息，否则排查时看不到真正原因
+				st.session_state.mcp_status = f"⚠️ 高德地图连接失败：{e}"
+				status.write(st.session_state.mcp_status)
 			stream = Runner.run_streamed(
 				st.session_state.current_agent,
 				input=prompt, # 问题
