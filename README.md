@@ -1,4 +1,4 @@
 # EasyAgent
 
-教程代码:https://github.com/wangyuxun6699/learn_claude_code_langchain
+内容包括 agent-craft learn-claude-code(original version & langchain version) Hello-Agent
 
