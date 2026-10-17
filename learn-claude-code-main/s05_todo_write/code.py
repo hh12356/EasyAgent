@@ -22,7 +22,7 @@ without an update, the harness adds a reminder alongside the tool results.
               rounds_since_todo >= 3 -> add <reminder>
 """
 
-import ast
+import ast # 把 Python 源代码字符串解析成一棵抽象语法树，用来分析、修改、生成代码
 import json
 import os
 import re
@@ -122,18 +122,22 @@ class TodoManager:
     def __init__(self):
         self.items: list[dict] = []
 
+    # 更新当前执行状态
     def update(self, todos: list | str) -> str:
         if isinstance(todos, str):
             try:
+                # 解析json字符串
                 todos = json.loads(todos)
             except json.JSONDecodeError:
                 try:
+                    #保底办法
                     todos = ast.literal_eval(todos)
                 except (SyntaxError, ValueError) as e:
                     raise ValueError("todos must be a list or JSON array string") from e
 
         if not isinstance(todos, list):
             raise ValueError("todos must be a list")
+        # 超过todos限制就退出？
         if len(todos) > 20:
             raise ValueError("Max 20 todos allowed")
 
@@ -159,6 +163,7 @@ class TodoManager:
         self.items = validated
         return self.render()
 
+    # 当前状态
     def render(self) -> str:
         if not self.items:
             return "No todos."
@@ -314,6 +319,7 @@ def agent_loop(messages: list):
                 continue
             return
 
+        # 调用执行工具
         results = []
         used_todo = False
         for block in tool_calls:

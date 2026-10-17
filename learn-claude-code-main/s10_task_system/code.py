@@ -21,13 +21,13 @@ s10_task_system.py - Task System
     pending --claim_task--> in_progress --complete_task--> completed
 """
 
-import glob
+import glob # 按通配符匹配查找文件路径
 import json
 import os
 import re
-import secrets
+import secrets # 内置安全随机数模块，用来生成密码、token、随机 ID
 import subprocess
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass # 用来快速定义数据承载类（数据模型）
 from pathlib import Path
 
 try:
@@ -67,6 +67,7 @@ SYSTEM = (
 
 # -- New in s10: persistent task records --
 
+# task文件夹地址
 TASKS_DIR = WORKDIR / ".tasks"
 TASK_ID_PATTERN = re.compile(r"^task_[0-9a-f]{8}$")
 
@@ -78,13 +79,14 @@ class Task:
     description: str
     status: str
     owner: str | None
-    blockedBy: list[str]
+    blockedBy: list[str] # 被哪些前置任务阻塞
 
 
 class TaskStore:
     def __init__(self, directory: Path):
         self.directory = directory
 
+    # 获取任务存储目录的绝对路径，同时做工作区安全校验
     def _root(self, create: bool = False) -> Path:
         if create:
             self.directory.mkdir(parents=True, exist_ok=True)
@@ -93,7 +95,9 @@ class TaskStore:
             raise ValueError("Task store escapes the workspace")
         return root
 
+    # 获取任务文件路径
     def _path(self, task_id: str, create_root: bool = False) -> Path:
+        # 检验task_id合法性
         if not isinstance(task_id, str) or not TASK_ID_PATTERN.fullmatch(task_id):
             raise ValueError(f"Invalid task ID: {task_id!r}")
         root = self._root(create=create_root)
@@ -102,9 +106,11 @@ class TaskStore:
             raise ValueError(f"Invalid task ID: {task_id!r}")
         return path
 
+    # 判断该任务是否存在
     def exists(self, task_id: str) -> bool:
         return self._path(task_id).is_file()
 
+    # 创建task文件
     def create(self, subject: str, description: str = "") -> Task:
         subject = subject.strip()
         if not subject:
@@ -124,12 +130,14 @@ class TaskStore:
                 with self._path(task.id, create_root=True).open(
                     "x", encoding="utf-8"
                 ) as handle:
+                    # 写入json文件
                     json.dump(asdict(task), handle, indent=2)
                 return task
             except FileExistsError:
                 continue
         raise RuntimeError("Could not allocate a unique task ID")
 
+    # 判断task_id是否依赖于target_id (DFS深度优先搜索)
     def _depends_on(self, task_id: str, target_id: str) -> bool:
         """Return whether task_id transitively depends on target_id."""
         pending = [task_id]
@@ -144,19 +152,22 @@ class TaskStore:
             pending.extend(self.load(current).blockedBy)
         return False
 
+    # 更新依赖项
     def update_dependencies(self, task_id: str,
                             add_blocked_by: list[str]) -> Task:
         if not isinstance(add_blocked_by, list):
             raise ValueError("addBlockedBy must be a list of task IDs")
 
+        # 获取具体任务
         task = self.load(task_id)
-        if task.status != "pending" or task.owner is not None:
+        if task.status != "pending" or task.owner is not None: # 有owner即已分配
             raise ValueError(
                 f"Task {task_id} dependencies can only be updated while "
                 "pending and unowned"
             )
 
-        dependencies = list(dict.fromkeys(add_blocked_by))
+        dependencies = list(dict.fromkeys(add_blocked_by)) # fromkeys() 对列表去重
+        # 检查待添加依赖项
         for dependency in dependencies:
             if dependency == task_id:
                 raise ValueError("Task cannot depend on itself")
@@ -176,12 +187,14 @@ class TaskStore:
         self.save(task)
         return task
 
+    # 保存task文件
     def save(self, task: Task) -> None:
         self._path(task.id, create_root=True).write_text(
             json.dumps(asdict(task), indent=2),
             encoding="utf-8",
         )
 
+    # 加载task文件
     def load(self, task_id: str) -> Task:
         data = json.loads(self._path(task_id).read_text(encoding="utf-8"))
         task = Task(**data)
@@ -191,11 +204,12 @@ class TaskStore:
             raise ValueError(f"Invalid task status: {task.status}")
         return task
 
+    # 列出所有任务
     def list(self) -> list[Task]:
         if not self.directory.exists():
             return []
         root = self._root()
-        return [self.load(path.stem)
+        return [self.load(path.stem) # .stem 去掉前后缀
                 for path in sorted(root.glob("task_*.json"))]
 
 
@@ -219,9 +233,10 @@ def list_tasks() -> list[Task]:
 
 
 def get_task(task_id: str) -> str:
-    return json.dumps(asdict(load_task(task_id)), indent=2)
+    return json.dumps(asdict(load_task(task_id)), indent=2) # json->dict->Task
 
 
+# 获取指定任务的未完成依赖项
 def incomplete_dependencies(task: Task) -> list[str]:
     incomplete = []
     for dependency in task.blockedBy:
@@ -233,10 +248,12 @@ def incomplete_dependencies(task: Task) -> list[str]:
     return incomplete
 
 
+# 判断任务是否可以开始(依赖项全部完成)
 def can_start(task_id: str) -> bool:
     return not incomplete_dependencies(load_task(task_id))
 
 
+# 认领任务
 def claim_task(task_id: str, owner: str = "agent") -> str:
     task = load_task(task_id)
     if task.status != "pending":
@@ -251,6 +268,7 @@ def claim_task(task_id: str, owner: str = "agent") -> str:
     return f"Claimed {task.id} ({task.subject})"
 
 
+# 完成任务+解锁新任务
 def complete_task(task_id: str, owner: str = "agent") -> str:
     task = load_task(task_id)
     if task.status != "in_progress":

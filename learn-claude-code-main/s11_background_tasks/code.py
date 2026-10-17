@@ -349,20 +349,26 @@ class BackgroundManager:
     def __init__(self):
         self.tasks: dict[str, dict] = {}
         self.results: dict[str, str] = {}
-        self._ready: list[str] = []
+        self._ready: list[str] = [] # 存放执行结束的task_id
         self._counter = 0
-        self._lock = threading.Lock()
+        self._lock = threading.Lock() # 线程互斥锁,同一时间最多只有 1 个线程拿到锁
 
+    # 启动后台任务
     def start(self, block) -> str:
+        # 只有bash指令能后台运行
         if block.name != "bash":
             raise ValueError("Only Bash commands can run in the background")
+
+        # 取出命令
         command = block.input.get("command")
         if not isinstance(command, str) or not command.strip():
             raise ValueError("Bash command cannot be empty")
 
+        # with 自动做任务准备和收尾
         with self._lock:
             self._counter += 1
             task_id = f"bg_{self._counter:04d}"
+            # 写入后台任务记录
             self.tasks[task_id] = {
                 "tool_use_id": block.id,
                 "command": command,
@@ -372,7 +378,7 @@ class BackgroundManager:
         thread = threading.Thread(
             target=self._run,
             args=(task_id, command),
-            daemon=True,
+            daemon=True, # 守护进程开启
         )
         try:
             thread.start()
@@ -383,9 +389,12 @@ class BackgroundManager:
         print(f"  [background] started {task_id}: {command[:60]}")
         return task_id
 
+    # 执行指令
     def _run(self, task_id: str, command: str):
         try:
+            # 执行并取得结果
             output, exit_code = _run_bash_process(command)
+            # 标准化结果
             result = _format_bash_result(output, exit_code)
             status = "completed" if exit_code == 0 else "failed"
         except Exception as error:
@@ -400,6 +409,7 @@ class BackgroundManager:
             self.results[task_id] = result
             self._ready.append(task_id)
 
+    # 收集已结束的进程并更新task状态
     def collect(self) -> list[str]:
         with self._lock:
             ready = []
@@ -469,6 +479,7 @@ def execute_tool(block) -> str:
     if blocked is not None:
         return str(blocked)
 
+    # bash任务一律后台执行
     if should_run_background(block.name, block.input):
         try:
             task_id = start_background_task(block)

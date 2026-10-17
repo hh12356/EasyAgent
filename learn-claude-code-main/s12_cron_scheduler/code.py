@@ -42,7 +42,7 @@ if os.getenv("ANTHROPIC_BASE_URL"):
     os.environ.pop("ANTHROPIC_AUTH_TOKEN", None)
 
 WORKDIR = Path.cwd()
-DURABLE_PATH = WORKDIR / ".scheduled_tasks.json"
+DURABLE_PATH = WORKDIR / ".scheduled_tasks.json" # 持久化文件位置
 client = Anthropic(base_url=os.getenv("ANTHROPIC_BASE_URL"))
 MODEL = os.environ["MODEL_ID"]
 
@@ -269,12 +269,12 @@ register_hook("Stop", summary_hook)
 @dataclass
 class CronJob:
     id: str
-    cron: str
+    cron: str # 定义触发任务时间
     prompt: str
-    recurring: bool
-    durable: bool
-    pending_delivery: bool = False
-    last_fired: str | None = None
+    recurring: bool # 是否重复执行
+    durable: bool # 持久化开关
+    pending_delivery: bool = False # 待投递标签
+    last_fired: str | None = None # 上次触发时间
 
 
 scheduled_jobs: dict[str, CronJob] = {}
@@ -282,27 +282,38 @@ cron_queue: list[CronJob] = []
 cron_lock = threading.RLock()
 
 
+# 用来判断cron段中的某一段跟当前数值是否匹配
 def _cron_field_matches(field: str, value: int) -> bool:
+    # * 代表任意值都匹配
     if field == "*":
         return True
+    # 间隔语法
     if field.startswith("*/"):
         return value % int(field[2:]) == 0
+    # 多值列表则递归调用自己
     if "," in field:
+        # 任意匹配就返回True
         return any(_cron_field_matches(part.strip(), value)
                    for part in field.split(","))
+    # 范围区间
     if "-" in field:
         start, end = field.split("-", 1)
         return int(start) <= value <= int(end)
+    # 保底直接判断
     return value == int(field)
 
 
 def cron_matches(cron_expr: str, moment: datetime) -> bool:
     fields = cron_expr.strip().split()
+    # cron长度必须为5
     if len(fields) != 5:
         return False
 
+    # 序列解包
     minute, hour, day, month, weekday = fields
+    # datetime.weekday()从0开始计
     cron_weekday = (moment.weekday() + 1) % 7
+    # 判断除天和星期之外的所有项
     if not (
         _cron_field_matches(minute, moment.minute)
         and _cron_field_matches(hour, moment.hour)
@@ -310,6 +321,7 @@ def cron_matches(cron_expr: str, moment: datetime) -> bool:
     ):
         return False
 
+    # 单独判断(这两个是OR关系)
     day_matches = _cron_field_matches(day, moment.day)
     weekday_matches = _cron_field_matches(weekday, cron_weekday)
     if day == "*" and weekday == "*":
@@ -321,20 +333,26 @@ def cron_matches(cron_expr: str, moment: datetime) -> bool:
     return day_matches or weekday_matches
 
 
+# 递归校验单条 cron 字段格式与数值范围(无错误返回None，报错返回str)
 def _validate_cron_field(field: str, minimum: int, maximum: int) -> str | None:
     if field == "*":
         return None
     if field.startswith("*/"):
         step = field[2:]
+        # 步长不是纯数字或步长小于0报错
         if not step.isdigit() or int(step) <= 0:
             return f"Invalid step: {field}"
         return None
+    # 分段递归验证
     if "," in field:
         for part in field.split(","):
             error = _validate_cron_field(part.strip(), minimum, maximum)
+            # 但凡有一个报错直接返回
             if error:
                 return error
+        # 全部通过
         return None
+    # 范围类型
     if "-" in field:
         start, end = field.split("-", 1)
         if not start.isdigit() or not end.isdigit():
@@ -345,6 +363,7 @@ def _validate_cron_field(field: str, minimum: int, maximum: int) -> str | None:
         if start_value < minimum or end_value > maximum:
             return f"Range {field} is outside [{minimum}-{maximum}]"
         return None
+    # 除上述情况，cron必须为数字
     if not field.isdigit():
         return f"Invalid field: {field}"
     value = int(field)
@@ -353,6 +372,7 @@ def _validate_cron_field(field: str, minimum: int, maximum: int) -> str | None:
     return None
 
 
+# 验证完整cron
 def validate_cron(cron_expr: str) -> str | None:
     fields = cron_expr.strip().split()
     if len(fields) != 5:
@@ -375,10 +395,12 @@ def validate_cron(cron_expr: str) -> str | None:
 def save_durable_jobs():
     with cron_lock:
         payload = [
+            # asdict()把dataclass实例对象，转换成普通Python字典
             asdict(job)
             for job in scheduled_jobs.values()
-            if job.durable
+            if job.durable # 取出需要持久化的job
         ]
+        # 创建临时文件，成功写入再替换原文件
         temporary = DURABLE_PATH.with_name(
             f"{DURABLE_PATH.name}.{os.getpid()}.{threading.get_ident()}.tmp"
         )
@@ -386,14 +408,16 @@ def save_durable_jobs():
             temporary.write_text(json.dumps(payload, indent=2), encoding="utf-8")
             os.replace(temporary, DURABLE_PATH)
         finally:
-            temporary.unlink(missing_ok=True)
+            temporary.unlink(missing_ok=True) # 报错则删除临时文件，改写失败
 
 
+# 加载持久化job
 def load_durable_jobs():
     if not DURABLE_PATH.exists():
         return
     try:
         payload = json.loads(DURABLE_PATH.read_text(encoding="utf-8"))
+        # 必须为jsonList
         if not isinstance(payload, list):
             raise ValueError("expected a JSON list")
     except (OSError, json.JSONDecodeError, ValueError) as error:
@@ -415,6 +439,7 @@ def load_durable_jobs():
             except (TypeError, ValueError) as error:
                 print(f"  [cron] skipped invalid saved job: {error}")
                 continue
+            # 加入执行目录
             scheduled_jobs[job.id] = job
             if job.pending_delivery:
                 cron_queue.append(job)
@@ -423,6 +448,7 @@ def load_durable_jobs():
         print(f"  [cron] loaded {loaded} durable job(s)")
 
 
+# 新建cron_id
 def new_cron_id() -> str:
     for _ in range(100):
         job_id = f"cron_{secrets.token_hex(4)}"
@@ -431,6 +457,7 @@ def new_cron_id() -> str:
     raise RuntimeError("Could not allocate a cron job ID")
 
 
+# 新增job
 def schedule_job(cron: str, prompt: str, recurring: bool = True,
                  durable: bool = True) -> CronJob | str:
     error = validate_cron(cron)
@@ -458,18 +485,21 @@ def schedule_job(cron: str, prompt: str, recurring: bool = True,
     return job
 
 
+# 删除job
 def cancel_job(job_id: str) -> str:
     with cron_lock:
         job = scheduled_jobs.get(job_id)
         if job is None:
             return f"Job {job_id} not found"
 
-        previous_queue = list(cron_queue)
+        previous_queue = list(cron_queue) # 备份cron_queue
         scheduled_jobs.pop(job_id)
         cron_queue[:] = [queued for queued in cron_queue if queued.id != job_id]
         try:
+            # 如果是该删除任务被持久化需更新持久化文件
             if job.durable:
                 save_durable_jobs()
+        # 报错还原
         except Exception:
             scheduled_jobs[job_id] = job
             cron_queue[:] = previous_queue
@@ -478,29 +508,38 @@ def cancel_job(job_id: str) -> str:
     return f"Cancelled {job_id}"
 
 
-def _enqueue_due_job(job: CronJob, minute_marker: str | None = None):
+# 将到期任务入队
+def _enqueue_due_job(job: CronJob, minute_marker: str | None = None): # minute_marker用来记录本次任务触发的时间标记
     old_pending = job.pending_delivery
     old_last_fired = job.last_fired
+    # 更新投递状态
     job.pending_delivery = True
     if minute_marker is not None:
         job.last_fired = minute_marker
     try:
+        # 若持久化则更新持久化文件
         if job.durable:
             save_durable_jobs()
+    # 报错还原
     except Exception:
         job.pending_delivery = old_pending
         job.last_fired = old_last_fired
         raise
+    # 加入队列
     cron_queue.append(job)
 
 
+# 轮询任务加入待处理
 def poll_due_jobs(moment: datetime):
+    # 生成规范化时间字符串(丢掉秒)
     minute_marker = moment.strftime("%Y-%m-%d %H:%M")
     with cron_lock:
         for job in list(scheduled_jobs.values()):
             try:
+                # 任务已处理
                 if job.pending_delivery or job.last_fired == minute_marker:
                     continue
+                # 判断并加入可处理任务
                 if cron_matches(job.cron, moment):
                     _enqueue_due_job(job, minute_marker)
                     print(f"  [cron] due {job.id}: {job.prompt[:60]}")
@@ -508,6 +547,7 @@ def poll_due_jobs(moment: datetime):
                 print(f"  [cron] could not enqueue {job.id}: {error}")
 
 
+# 取出队列中的待处理任务
 def consume_cron_queue() -> list[CronJob]:
     with cron_lock:
         jobs = list(cron_queue)
@@ -515,6 +555,7 @@ def consume_cron_queue() -> list[CronJob]:
     return jobs
 
 
+# 完成任务收尾:循环任务重置 pending 标记，一次性任务直接删除
 def acknowledge_cron_jobs(jobs: list[CronJob]):
     changed: list[tuple[CronJob, bool]] = []
     removed: list[CronJob] = []
@@ -545,6 +586,7 @@ def acknowledge_cron_jobs(jobs: list[CronJob]):
             raise
 
 
+# 恢复一批 Cron 定时任务，把标记为已投递的任务重新放回待执行队列
 def restore_cron_jobs(jobs: list[CronJob]):
     with cron_lock:
         queued_ids = {job.id for job in cron_queue}
@@ -558,19 +600,23 @@ def restore_cron_jobs(jobs: list[CronJob]):
                 queued_ids.add(current.id)
 
 
+# 判断待执行队列是否为空
 def has_cron_queue() -> bool:
     with cron_lock:
         return bool(cron_queue)
 
 
+# 创建cron定时任务
 def run_schedule_cron(cron: str, prompt: str, recurring: bool = True,
                       durable: bool = True) -> str:
     result = schedule_job(cron, prompt, recurring, durable)
+    # schedule_job()报错时返回字符串
     if isinstance(result, str):
         return f"Error: {result}"
     return f"Scheduled {result.id}: {cron} -> {prompt}"
 
 
+# 读取全部定时任务
 def run_list_crons() -> str:
     with cron_lock:
         jobs = list(scheduled_jobs.values())
@@ -588,10 +634,12 @@ def run_list_crons() -> str:
     return "\n".join(lines)
 
 
+# 删除任务
 def run_cancel_cron(job_id: str) -> str:
     return cancel_job(job_id)
 
 
+# 加入cron相关工具
 TOOLS.extend([
     {"name": "schedule_cron",
      "description": "Schedule a prompt with a 5-field cron expression.",
@@ -610,6 +658,7 @@ TOOLS.extend([
                       "required": ["job_id"]}},
 ])
 
+# 字典没有append(),追加使用update()
 TOOL_HANDLERS.update({
     "schedule_cron": run_schedule_cron,
     "list_crons": run_list_crons,
@@ -633,22 +682,24 @@ def execute_tool(block) -> str:
 
 # -- Scheduler and agent loop --
 
-RUNTIME_STOP = threading.Event()
-runtime_threads: list[threading.Thread] = []
-runtime_started = False
+RUNTIME_STOP = threading.Event() # 用来通知所有后台运行线程停止
+runtime_threads: list[threading.Thread] = [] # 保存所有启动的后台运行线程对象
+runtime_started = False # 记录运行时是否已经启动
 runtime_lock = threading.Lock()
 agent_lock = threading.Lock()
 session_history: list = []
 
 
+# 每秒轮询一次，检查有没有到期的定时任务需要触发；外部调用RUNTIME_STOP.set()，循环在下一次 wait 时退出
 def cron_scheduler_loop(stop_event: threading.Event = RUNTIME_STOP):
     while not stop_event.wait(1.0):
         poll_due_jobs(datetime.now())
 
 
 def agent_loop(messages: list, context: dict | None = None):
-    fired = consume_cron_queue()
+    fired = consume_cron_queue() # 待处理任务
     scheduled_start = len(messages)
+    # 将待执行任务加入上下文
     for job in fired:
         messages.append({"role": "user", "content": f"[Scheduled] {job.prompt}"})
         print(f"  [cron] delivered {job.id}: {job.prompt[:60]}")
@@ -663,6 +714,7 @@ def agent_loop(messages: list, context: dict | None = None):
                 tools=TOOLS,
                 max_tokens=8000,
             )
+        # 报错时把上下文中的任务导回列表
         except Exception as error:
             if waiting_for_ack:
                 del messages[scheduled_start:]
@@ -673,6 +725,7 @@ def agent_loop(messages: list, context: dict | None = None):
         messages.append({"role": "assistant", "content": response.content})
         if waiting_for_ack:
             try:
+                # cron完成收尾
                 acknowledge_cron_jobs(waiting_for_ack)
             except Exception as error:
                 print(f"  [cron] acknowledgement failed: {error}")
@@ -699,6 +752,7 @@ def agent_loop(messages: list, context: dict | None = None):
         messages.append({"role": "user", "content": results})
 
 
+# 打印llm回复内容
 def print_latest_assistant_text(messages: list):
     for message in reversed(messages):
         if message.get("role") != "assistant":
@@ -714,35 +768,40 @@ def print_latest_assistant_text(messages: list):
                     print(block.get("text", ""))
         return
 
-
+# 执行agent_loop
 def run_agent_turn_locked(user_query: str | None = None):
     if user_query is not None:
-        trigger_hooks("UserPromptSubmit", user_query)
+        trigger_hooks("UserPromptSubmit", user_query) # Hook
         session_history.append({"role": "user", "content": user_query})
     agent_loop(session_history)
     print_latest_assistant_text(session_history)
     print()
 
 
+# 后台执行任务
 def queue_processor_loop(stop_event: threading.Event = RUNTIME_STOP):
     while not stop_event.wait(0.2):
-        if not has_cron_queue() or not agent_lock.acquire(blocking=False):
+        if not has_cron_queue() or not agent_lock.acquire(blocking=False): # 查看队列是否有内容和锁是否被占用
             continue
         try:
+            # cron到时时自动执行
             if has_cron_queue():
                 run_agent_turn_locked()
         finally:
             agent_lock.release()
 
 
+# 启动轮询执行进程
 def start_runtime_threads():
     global runtime_started
     with runtime_lock:
+        # 已被启动则退出
         if runtime_started:
             return
         load_durable_jobs()
         RUNTIME_STOP.clear()
         runtime_threads.extend([
+            # 后台持续轮询
             threading.Thread(
                 target=cron_scheduler_loop,
                 name="cron-scheduler",
@@ -759,14 +818,15 @@ def start_runtime_threads():
         runtime_started = True
 
 
+# 停止后台进程
 def stop_runtime_threads():
     global runtime_started
     with runtime_lock:
         if not runtime_started:
             return
-        RUNTIME_STOP.set()
+        RUNTIME_STOP.set() # 退出后台执行
         for thread in runtime_threads:
-            thread.join(timeout=1)
+            thread.join(timeout=1) # 等待该进程结束，最多等一秒
         runtime_threads.clear()
         runtime_started = False
 
