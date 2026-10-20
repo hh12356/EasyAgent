@@ -19,16 +19,16 @@ Run:
 """
 
 import asyncio
-import fcntl
-import hashlib
-import importlib.util
+import fcntl # 对文件描述符执行文件控制操作：文件锁
+import hashlib # 用来做密码摘要、文件校验
+import importlib.util # 运行时动态加载 py 文件
 import json
 import os
 import re
 import secrets
 import sys
 import threading
-from contextlib import contextmanager
+from contextlib import contextmanager # 快速自定义上下文管理器
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -41,24 +41,27 @@ WORKFLOW_AGENT_ENVIRONMENT = (
 )
 
 # -- Runtime Guards --
-AGENT_CAP = 1000                       # hard cap on agent() calls per run
-CONCURRENCY = 8                        # parallelism cap (semaphore)
-STORE = Path(__file__).parent / ".runtime"   # snapshots + journals live here
+AGENT_CAP = 1000                       # hard cap on agent() calls per run 单次运行中 agent () 调用次数的硬上限
+CONCURRENCY = 8                        # parallelism cap (semaphore) 并行上限（信号量）
+STORE = Path(__file__).parent / ".runtime"   # snapshots + journals live here 快照和日志存放地址
 MISS = object()                        # journal cache miss sentinel
 WORKFLOW_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
 RUN_ID_RE = re.compile(r"^wf_[A-Za-z0-9][A-Za-z0-9._-]{0,63}_[0-9a-f]{16}$")
 
 
+# 进程稳定哈希（Python 的 hash () 按进程添加随机盐值，这会导致在run和resume之间恢复密钥失效）
 def _stable_hash(s: str) -> int:
     """Process-stable hash (Python's hash() is salted per process, which would
     break resume keys across `run` and `resume`)."""
     return int(hashlib.sha256(s.encode()).hexdigest(), 16)
 
 
+# 生成工作流单次运行的唯一标识字符串
 def create_run_id(meta) -> str:
     return f"wf_{meta['name']}_{secrets.token_hex(8)}"
 
 
+# 预占 / 申领一个唯一可用的 run_id
 def reserve_run_id(meta) -> str:
     """Reserve a fresh run identity before any journal can be truncated."""
     STORE.mkdir(parents=True, exist_ok=True)
@@ -66,6 +69,7 @@ def reserve_run_id(meta) -> str:
         run_id = validate_run_id(create_run_id(meta))
         snapshot_path = STORE / f"{run_id}.json"
         try:
+            # 原子创建文件(Linux&mac专属)
             fd = os.open(snapshot_path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
         except FileExistsError:
             continue
@@ -74,10 +78,12 @@ def reserve_run_id(meta) -> str:
     raise WorkflowInputError("could not allocate a unique workflow runId")
 
 
+# 创建task_id
 def create_task_id(run_id) -> str:
     return f"local_workflow_{run_id}"
 
 
+# 校验 ID 格式是否合法
 def validate_run_id(run_id):
     if not isinstance(run_id, str) or not RUN_ID_RE.fullmatch(run_id):
         raise WorkflowInputError("invalid workflow runId")
@@ -85,6 +91,7 @@ def validate_run_id(run_id):
 
 
 # -- Errors --
+# 工作流、元数据或模式输入错误
 class WorkflowInputError(Exception):
     """Bad workflow, metadata, or schema input."""
 
@@ -93,6 +100,7 @@ _run_locks_guard = threading.Lock()
 _run_locks: dict[str, threading.Lock] = {}
 
 
+# 双层锁机制：线程锁 + fcntl 文件锁，用来保护同一个 run_id，做到：同进程内多线程互斥，同时跨多个主机进程互斥
 @contextmanager
 def workflow_run_lock(run_id: str):
     """Hold one run across threads and host processes for its full lifecycle."""
@@ -124,7 +132,7 @@ def workflow_run_lock(run_id: str):
                 _run_locks.pop(run_id, None)
 
 
-# -- Metadata Validation --
+# -- Metadata Validation -- 元数据验证
 def validate_meta(meta):
     """Validate name, description, and optional phases before launch."""
     if not isinstance(meta, dict):
@@ -144,7 +152,7 @@ def validate_meta(meta):
             raise WorkflowInputError("meta.phases must be a list of non-empty strings")
     return meta
 
-
+# 工作流启动前的黑名单权限校验
 def check_permission(meta, settings=None):
     """Apply the s03 allow/deny gate before launching a workflow."""
     settings = settings or {}
@@ -153,7 +161,7 @@ def check_permission(meta, settings=None):
     return "allow"
 
 
-# -- Minimal JSON Schema --
+# -- Minimal JSON Schema -- 小型校验器支持智能体 ({schema})：对象 / 数组 / 字符串 / 布尔值 / 数字 + 必填键
 class SimpleJsonSchema:
     """Tiny validator backing agent({schema}):
     object/array/string/boolean/number + required keys."""
@@ -197,7 +205,7 @@ class SimpleJsonSchema:
             return (ok, None if ok else "expected number")
         return True, None
 
-
+# 确定性地根据 JSON Schema 自动生成模拟数据
 def _fill_schema(schema, seed):
     """Deterministic generic filler used for schemas the mock doesn't special-case."""
     t = schema.get("type")
@@ -221,7 +229,7 @@ class RunnerOutput:
     value: object
     tokens: int
 
-
+# 模拟 Agent 执行器，用于演示模式和单元测试，不调用真实大模型
 class MockAgentRunner:
     """Deterministic runner used by demo mode and unit tests."""
 
@@ -251,6 +259,7 @@ class MockAgentRunner:
         return len(prompt) // 4 + len(json.dumps(result, default=str)) // 4
 
 
+# 提取response中的text
 def _response_text(response) -> str:
     return "\n".join(
         str(getattr(block, "text", ""))
@@ -259,6 +268,7 @@ def _response_text(response) -> str:
     ).strip()
 
 
+# 解析大模型返回的 JSON 字符串
 def _parse_runner_json(text: str) -> object:
     stripped = text.strip()
     if stripped.startswith("```"):
@@ -282,6 +292,7 @@ def _parse_runner_json(text: str) -> object:
         raise WorkflowInputError("workflow agent returned invalid JSON")
 
 
+# 真实调用大模型
 class AnthropicAgentRunner:
     """Run workflow agents through the same API client as the host."""
 
@@ -325,7 +336,7 @@ class AnthropicAgentRunner:
 RUNNER_FACTORY = MockAgentRunner
 
 
-# -- Journal --
+# -- Journal -- 工作流断点续跑的日志管理器
 class WorkflowJournal:
     """Append-only <runId>.journal.jsonl. On resume, agent() calls whose
     semantic key is already present are replayed from cache instead of re-run."""
