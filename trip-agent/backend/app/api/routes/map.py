@@ -1,4 +1,4 @@
-"""地图服务API路由"""
+"""地图服务API路由(调用高德MCP)"""
 
 from fastapi import APIRouter, HTTPException, Query
 from typing import Optional
@@ -16,7 +16,7 @@ router = APIRouter(prefix="/map", tags=["地图服务"])
 
 @router.get(
     "/poi",
-    response_model=POISearchResponse,
+    response_model=POISearchResponse, # 规定返回体格式
     summary="搜索POI",
     description="根据关键词搜索POI(兴趣点)"
 )

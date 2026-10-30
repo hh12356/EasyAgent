@@ -33,7 +33,7 @@ class UnsplashService:
             }
             
             response = requests.get(url, params=params, timeout=10)
-            response.raise_for_status()
+            response.raise_for_status() # 抛出返回异常
             
             data = response.json()
             results = data.get("results", [])
@@ -65,7 +65,7 @@ class UnsplashService:
         Returns:
             图片URL
         """
-        photos = self.search_photos(query, per_page=1)
+        photos = self.search_photos(query, per_page=1) # 设置上限为1
         if photos:
             return photos[0].get("url")
         return None

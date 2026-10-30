@@ -15,7 +15,7 @@ helloagents_env = Path(__file__).parent.parent.parent.parent / "HelloAgents" / "
 if helloagents_env.exists():
     load_dotenv(helloagents_env, override=False)  # 不覆盖已有的环境变量
 
-
+# BaseSetting会读取.env中的配置，如果没有再启用默认值
 class Settings(BaseSettings):
     """应用配置"""
 

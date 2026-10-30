@@ -32,7 +32,7 @@ class TripRequest(BaseModel):
             }
         }
 
-
+# ...代表无默认值，为必填项
 class POISearchRequest(BaseModel):
     """POI搜索请求"""
     keywords: str = Field(..., description="搜索关键词", example="故宫")

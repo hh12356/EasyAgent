@@ -24,11 +24,11 @@ def get_amap_mcp_tool() -> MCPTool:
         if not settings.amap_api_key:
             raise ValueError("高德地图API Key未配置,请在.env文件中设置AMAP_API_KEY")
         
-        # 创建MCP工具
+        # 创建MCP工具(MCPTool是HelloAgent的工具)
         _amap_mcp_tool = MCPTool(
             name="amap",
             description="高德地图服务,支持POI搜索、路线规划、天气查询等功能",
-            server_command=["uvx", "amap-mcp-server"],
+            server_command=["uvx", "--with", "pydantic<2.11", "amap-mcp-server"], # 拉起子进程调用MCP
             env={"AMAP_MAPS_API_KEY": settings.amap_api_key},
             auto_expand=True  # 自动展开为独立工具
         )
