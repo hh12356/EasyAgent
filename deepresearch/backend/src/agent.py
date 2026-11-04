@@ -1,4 +1,4 @@
-"""Orchestrator coordinating the deep research workflow."""
+"""Orchestrator coordinating the deep research workflow. 编排器协调深度研究工作流"""
 
 from __future__ import annotations
 
@@ -30,28 +30,33 @@ logger = logging.getLogger(__name__)
 
 
 class DeepResearchAgent:
-    """Coordinator orchestrating TODO-based research workflow using HelloAgents."""
+    """Coordinator orchestrating 协调员统筹安排 TODO-based research workflow using HelloAgents. 基于 HelloAgents、以待办事项为驱动的研究工作流"""
 
     def __init__(self, config: Configuration | None = None) -> None:
         """Initialise the coordinator with configuration and shared tools."""
         self.config = config or Configuration.from_env()
         self.llm = self._init_llm()
 
+        # 笔记工具实例
         self.note_tool = (
             NoteTool(workspace=self.config.notes_workspace)
             if self.config.enable_notes
             else None
         )
+        # 工具注册表
         self.tools_registry: ToolRegistry | None = None
         if self.note_tool:
             registry = ToolRegistry()
             registry.register_tool(self.note_tool)
             self.tools_registry = registry
 
+        # 工具调用追踪器
         self._tool_tracker = ToolCallTracker(
             self.config.notes_workspace if self.config.enable_notes else None
         )
+        # 标记位，是否开启工具事件回调 sink
         self._tool_event_sink_enabled = False
+        # 线程锁
         self._state_lock = Lock()
 
         self.todo_agent = self._create_tool_aware_agent(
@@ -71,11 +76,13 @@ class DeepResearchAgent:
         self.planner = PlanningService(self.todo_agent, self.config)
         self.summarizer = SummarizationService(self._summarizer_factory, self.config)
         self.reporting = ReportingService(self.report_agent, self.config)
+        # 存放上一轮搜索的提示 / 通知文本
         self._last_search_notices: list[str] = []
 
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
+    # 准备参数并初始化llm
     def _init_llm(self) -> HelloAgentsLLM:
         """Instantiate HelloAgentsLLM following configuration preferences."""
         llm_kwargs: dict[str, Any] = {"temperature": 0.0}
@@ -106,6 +113,7 @@ class DeepResearchAgent:
 
         return HelloAgentsLLM(**llm_kwargs)
 
+    # 实例化一个共享工具注册表与追踪器的 ToolAwareSimpleAgent
     def _create_tool_aware_agent(self, *, name: str, system_prompt: str) -> ToolAwareSimpleAgent:
         """Instantiate a ToolAwareSimpleAgent sharing tool registry and tracker."""
         return ToolAwareSimpleAgent(
@@ -117,15 +125,17 @@ class DeepResearchAgent:
             tool_call_listener=self._tool_tracker.record,
         )
 
+    # 注册 / 解绑工具事件回调
     def _set_tool_event_sink(self, sink: Callable[[dict[str, Any]], None] | None) -> None:
         """Enable or disable immediate tool event callbacks."""
         self._tool_event_sink_enabled = sink is not None
         self._tool_tracker.set_event_sink(sink)
 
     def run(self, topic: str) -> SummaryStateOutput:
-        """Execute the research workflow and return the final report."""
+        """Execute the research workflow and return the final report. 执行研究工作流并返回最终报告"""
         state = SummaryState(research_topic=topic)
         state.todo_items = self.planner.plan_todo_list(state)
+        # 取出本轮事件
         self._drain_tool_events(state)
 
         if not state.todo_items:
@@ -148,7 +158,7 @@ class DeepResearchAgent:
         )
 
     def run_stream(self, topic: str) -> Iterator[dict[str, Any]]:
-        """Execute the workflow yielding incremental progress events."""
+        """Execute the workflow yielding incremental progress events. 执行工作流，生成增量进度事件"""
         state = SummaryState(research_topic=topic)
         logger.debug("Starting streaming research: topic=%s", topic)
         yield {"type": "status", "message": "初始化研究流程"}
@@ -173,6 +183,7 @@ class DeepResearchAgent:
 
         event_queue: Queue[dict[str, Any]] = Queue()
 
+        # 事件字典加工补充task_id、step、stream_token字段，然后丢进事件队列
         def enqueue(
             event: dict[str, Any],
             *,
@@ -193,6 +204,7 @@ class DeepResearchAgent:
                 payload["step"] = step_override
             event_queue.put(payload)
 
+        # 工具事件接收器
         def tool_event_sink(event: dict[str, Any]) -> None:
             enqueue(event)
 
@@ -286,13 +298,14 @@ class DeepResearchAgent:
     # ------------------------------------------------------------------
     # Execution helpers
     # ------------------------------------------------------------------
+    # 执行任务
     def _execute_task(
         self,
         state: SummaryState,
         task: TodoItem,
         *,
-        emit_stream: bool,
-        step: int | None = None,
+        emit_stream: bool, # 是否开启流式推送事件
+        step: int | None = None, # 当前任务对应的步骤序号
     ) -> Iterator[dict[str, Any]]:
         """Run search + summarization for a single task."""
         task.status = "in_progress"
@@ -343,6 +356,7 @@ class DeepResearchAgent:
             if not emit_stream:
                 self._drain_tool_events(state)
 
+        # 搜索失败的兜底
         sources_summary, context = prepare_research_context(
             search_result,
             answer_text,
@@ -412,6 +426,7 @@ class DeepResearchAgent:
         else:
             self._drain_tool_events(state)
 
+    # 从追踪器取出本轮工具事件；如果开启了事件回调 sink 就直接清空不返回事件，否则返回事件列表
     def _drain_tool_events(
         self,
         state: SummaryState,
@@ -424,13 +439,8 @@ class DeepResearchAgent:
             return []
         return events
 
-    @property
-    def _tool_call_events(self) -> list[dict[str, Any]]:
-        """Expose recorded tool events for legacy integrations."""
-        return self._tool_tracker.as_dicts()
-
     def _serialize_task(self, task: TodoItem) -> dict[str, Any]:
-        """Convert task dataclass to serializable dict for frontend."""
+        """Convert task dataclass to serializable dict for frontend. 将任务数据类转换为可序列化字典，供前端使用"""
         return {
             "id": task.id,
             "title": task.title,
@@ -444,6 +454,7 @@ class DeepResearchAgent:
             "stream_token": task.stream_token,
         }
 
+    # 保存最终报告
     def _persist_final_report(self, state: SummaryState, report: str) -> dict[str, Any] | None:
         if not self.note_tool or not report or not report.strip():
             return None
@@ -479,6 +490,7 @@ class DeepResearchAgent:
                     "content": content,
                 }
             )
+            # 新建后取出新建id
             note_id = self._extract_note_id_from_text(response)
 
         if not note_id:
@@ -502,6 +514,7 @@ class DeepResearchAgent:
 
         return payload
 
+    # 查询已有报告id
     def _find_existing_report_note_id(self, state: SummaryState) -> str | None:
         if state.report_note_id:
             return state.report_note_id
@@ -533,6 +546,7 @@ class DeepResearchAgent:
 
         return None
 
+    # 提取note_id
     @staticmethod
     def _extract_note_id_from_text(response: str) -> str | None:
         if not response:
@@ -545,7 +559,8 @@ class DeepResearchAgent:
         return match.group(1).strip()
 
 
+# 没被用过
 def run_deep_research(topic: str, config: Configuration | None = None) -> SummaryStateOutput:
-    """Convenience function mirroring the class-based API."""
+    """Convenience function mirroring the class-based API. 与基于类的应用程序接口相对应的便捷函数"""
     agent = DeepResearchAgent(config=config)
     return agent.run(topic)

@@ -6,6 +6,7 @@ import json
 import sys
 from typing import Any, Dict, Iterator, Optional
 
+from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
@@ -14,6 +15,8 @@ from pydantic import BaseModel, Field
 
 from config import Configuration, SearchAPI
 from agent import DeepResearchAgent
+
+load_dotenv()  # 从 backend/.env 读取 LLM 配置，否则会静默回退到 ollama 默认值
 
 # 添加控制台日志处理程序
 logger.add(
@@ -54,7 +57,7 @@ class ResearchResponse(BaseModel):
         description="Structured TODO items with summaries and sources",
     )
 
-
+# 对敏感令牌进行掩码处理，保留首尾字符
 def _mask_secret(value: Optional[str], visible: int = 4) -> str:
     """Mask sensitive tokens while keeping leading and trailing characters."""
     if not value:
@@ -65,7 +68,7 @@ def _mask_secret(value: Optional[str], visible: int = 4) -> str:
 
     return f"{value[:visible]}...{value[-visible:]}"
 
-
+# 获得config
 def _build_config(payload: ResearchRequest) -> Configuration:
     overrides: Dict[str, Any] = {}
 
@@ -86,6 +89,7 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
+    # 已更新为lifespan
     @app.on_event("startup")
     def log_startup_configuration() -> None:
         config = Configuration.from_env()
@@ -121,9 +125,9 @@ def create_app() -> FastAPI:
             config = _build_config(payload)
             agent = DeepResearchAgent(config=config)
             result = agent.run(payload.topic)
-        except ValueError as exc:  # Likely due to unsupported configuration
+        except ValueError as exc:  # Likely due to unsupported configuration 大概率是由于不支持的配置
             raise HTTPException(status_code=400, detail=str(exc)) from exc
-        except Exception as exc:  # pragma: no cover - defensive guardrail
+        except Exception as exc:  # pragma: no cover - defensive guardrail 防御性防护措施
             raise HTTPException(status_code=500, detail="Research failed") from exc
 
         todo_payload = [
@@ -154,6 +158,7 @@ def create_app() -> FastAPI:
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 
+        # 事件迭代器
         def event_iterator() -> Iterator[str]:
             try:
                 for event in agent.run_stream(payload.topic):

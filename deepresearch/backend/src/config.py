@@ -36,6 +36,7 @@ class Configuration(BaseModel):
         title="Search API",
         description="Web search API to use",
     )
+    # 是否在笔记工具中保存任务进度
     enable_notes: bool = Field(
         default=True,
         title="Enable Notes",
@@ -61,6 +62,7 @@ class Configuration(BaseModel):
         title="LMStudio Base URL",
         description="Base URL for LMStudio OpenAI-compatible API",
     )
+    # 是否从模型输出中剔除标记
     strip_thinking_tokens: bool = Field(
         default=True,
         title="Strip Thinking Tokens",
@@ -94,12 +96,13 @@ class Configuration(BaseModel):
         raw_values: dict[str, Any] = {}
 
         # Load values from environment variables based on field names
+        # 根据字段名称从环境变量中加载值
         for field_name in cls.model_fields.keys():
             env_key = field_name.upper()
             if env_key in os.environ:
                 raw_values[field_name] = os.environ[env_key]
 
-        # Additional mappings for explicit env names
+        # Additional mappings for explicit env names 显式环境名称的额外映射
         env_aliases = {
             "local_llm": os.getenv("LOCAL_LLM"),
             "llm_provider": os.getenv("LLM_PROVIDER"),
@@ -119,7 +122,7 @@ class Configuration(BaseModel):
 
         for key, value in env_aliases.items():
             if value is not None:
-                raw_values.setdefault(key, value)
+                raw_values.setdefault(key, value) # setdefault()不改变已有的值
 
         if overrides:
             for key, value in overrides.items():
@@ -128,6 +131,7 @@ class Configuration(BaseModel):
 
         return cls(**raw_values)
 
+    # 确保 Ollama 基础地址带上 OpenAI 客户端所需的 /v1 后缀
     def sanitized_ollama_url(self) -> str:
         """Ensure Ollama base URL includes the /v1 suffix required by OpenAI clients."""
 
@@ -136,6 +140,7 @@ class Configuration(BaseModel):
             base = f"{base}/v1"
         return base
 
+    # 尽力解析出待使用的模型标识符
     def resolved_model(self) -> Optional[str]:
         """Best-effort resolution of the model identifier to use."""
 

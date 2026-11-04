@@ -1,0 +1,118 @@
+{
+  "notes": [
+    {
+      "id": "note_20261030_220313_0",
+      "title": "任务 1: 全名单核实",
+      "type": "task_state",
+      "tags": [
+        "deep_research",
+        "task_1"
+      ],
+      "created_at": "2026-10-30T22:03:13.414435"
+    },
+    {
+      "id": "note_20261030_220313_1",
+      "title": "任务 2: 科学三奖解读",
+      "type": "task_state",
+      "tags": [
+        "deep_research",
+        "task_2"
+      ],
+      "created_at": "2026-10-30T22:03:13.436182"
+    },
+    {
+      "id": "note_20261030_220313_2",
+      "title": "任务 3: 文学与和平奖",
+      "type": "task_state",
+      "tags": [
+        "deep_research",
+        "task_3"
+      ],
+      "created_at": "2026-10-30T22:03:13.441222"
+    },
+    {
+      "id": "note_20261030_220313_3",
+      "title": "任务 4: 经济学奖解析",
+      "type": "task_state",
+      "tags": [
+        "deep_research",
+        "task_4"
+      ],
+      "created_at": "2026-10-30T22:03:13.442698"
+    },
+    {
+      "id": "note_20261030_220313_4",
+      "title": "任务 5: 反响与争议",
+      "type": "task_state",
+      "tags": [
+        "deep_research",
+        "task_5"
+      ],
+      "created_at": "2026-10-30T22:03:13.443815"
+    },
+    {
+      "id": "note_20261030_220426_5",
+      "title": "任务 1: 奖项全景与名单核对",
+      "type": "task_state",
+      "tags": [
+        "deep_research",
+        "task_1"
+      ],
+      "created_at": "2026-10-30T22:04:26.322613"
+    },
+    {
+      "id": "note_20261030_220426_6",
+      "title": "任务 2: 科学三奖原理",
+      "type": "task_state",
+      "tags": [
+        "deep_research",
+        "task_2"
+      ],
+      "created_at": "2026-10-30T22:04:26.325619"
+    },
+    {
+      "id": "note_20261030_220426_7",
+      "title": "任务 3: 文学与和平奖",
+      "type": "task_state",
+      "tags": [
+        "deep_research",
+        "task_3"
+      ],
+      "created_at": "2026-10-30T22:04:26.326720"
+    },
+    {
+      "id": "note_20261030_220433_8",
+      "title": "任务 4: 经济学奖与趋势",
+      "type": "task_state",
+      "tags": [
+        "deep_research",
+        "task_4"
+      ],
+      "created_at": "2026-10-30T22:04:33.390311"
+    },
+    {
+      "id": "note_20261030_220433_9",
+      "title": "任务 5: 反响与预测复盘",
+      "type": "task_state",
+      "tags": [
+        "deep_research",
+        "task_5"
+      ],
+      "created_at": "2026-10-30T22:04:33.392682"
+    },
+    {
+      "id": "note_20261030_220500_10",
+      "title": "研究报告：2025的诺贝尔奖得主",
+      "type": "conclusion",
+      "tags": [
+        "deep_research",
+        "report"
+      ],
+      "created_at": "2026-10-30T22:05:00.740865"
+    }
+  ],
+  "metadata": {
+    "created_at": "2026-10-30T22:03:01.932507",
+    "total_notes": 11
+  }
+}

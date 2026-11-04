@@ -11,6 +11,8 @@ requires-python = ">=3.10"
 dependencies = [
     "fastapi>=0.115.0",
     "hello-agents==0.2.9",
+    # hello-agents 的 __init__ 会导入 evaluation 模块并引用它，但没声明依赖（上游打包缺陷）
+    "huggingface_hub>=0.20.0",
     "tavily-python>=0.5.0",
     "python-dotenv==1.0.1",
     "requests>=2.31.0",
